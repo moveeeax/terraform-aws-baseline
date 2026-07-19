@@ -9,7 +9,7 @@ giving new accounts sane security defaults in one place.
 
 ```hcl
 module "baseline" {
-  source = "github.com/cybercapybara/terraform-aws-baseline"
+  source = "github.com/moveeeax/terraform-aws-baseline"
 
   log_bucket_name         = "acme-account-logs"
   minimum_password_length = 16
