@@ -81,15 +81,31 @@ resource "aws_s3_account_public_access_block" "this" {
   restrict_public_buckets = true
 }
 
+# The variables document 0 as "disable this", but the IAM
+# UpdateAccountPasswordPolicy API rejects a literal 0 for both of these
+# fields with ValidationException -- its valid range is a minimum of 1
+# (1-1095 for MaxPasswordAge, 1-24 for PasswordReusePrevention). The only way
+# to get the "never expire" / "no reuse prevention" behavior is to omit the
+# argument entirely, so translate 0 into null rather than passing it straight
+# through. Both arguments are Optional+Computed, so this reliably disables
+# the setting when the policy is first created; flipping an already-nonzero
+# value back to 0 later may not clear it on AWS's side in the same apply,
+# since Terraform does not send an explicit "unset" for a null
+# Optional+Computed attribute on update.
+locals {
+  max_password_age          = var.max_password_age > 0 ? var.max_password_age : null
+  password_reuse_prevention = var.password_reuse_prevention > 0 ? var.password_reuse_prevention : null
+}
+
 resource "aws_iam_account_password_policy" "this" {
   minimum_password_length        = var.minimum_password_length
   require_symbols                = var.require_symbols
   require_numbers                = var.require_numbers
   require_uppercase_characters   = var.require_uppercase_characters
   require_lowercase_characters   = var.require_lowercase_characters
-  max_password_age               = var.max_password_age
-  password_reuse_prevention      = var.password_reuse_prevention
   allow_users_to_change_password = var.allow_users_to_change_password
+  max_password_age               = local.max_password_age
+  password_reuse_prevention      = local.password_reuse_prevention
 }
 
 resource "aws_ebs_encryption_by_default" "this" {
