@@ -90,6 +90,54 @@ variable "enable_ebs_encryption_by_default" {
   default     = true
 }
 
+variable "ebs_snapshot_block_public_access" {
+  description = "Regional block public access mode for EBS snapshots: block-all-sharing, block-new-sharing or unblocked. Null leaves the setting unmanaged."
+  type        = string
+  default     = "block-all-sharing"
+
+  validation {
+    condition     = var.ebs_snapshot_block_public_access == null ? true : contains(["block-all-sharing", "block-new-sharing", "unblocked"], var.ebs_snapshot_block_public_access)
+    error_message = "ebs_snapshot_block_public_access must be block-all-sharing, block-new-sharing, unblocked or null."
+  }
+}
+
+variable "ec2_image_block_public_access" {
+  description = "Whether to block new public sharing of AMIs in the region. False leaves the setting unmanaged."
+  type        = bool
+  default     = true
+}
+
+variable "instance_metadata_defaults" {
+  description = "Regional instance metadata (IMDS) defaults applied to new instances that do not set metadata_options themselves. Null leaves the defaults unmanaged."
+  type = object({
+    http_endpoint               = optional(string, "no-preference")
+    http_tokens                 = optional(string, "required")
+    http_put_response_hop_limit = optional(number, 2)
+    instance_metadata_tags      = optional(string, "disabled")
+  })
+  default = {}
+
+  validation {
+    condition = var.instance_metadata_defaults == null ? true : alltrue([
+      contains(["enabled", "disabled", "no-preference"], var.instance_metadata_defaults.http_endpoint),
+      contains(["optional", "required", "no-preference"], var.instance_metadata_defaults.http_tokens),
+      contains(["enabled", "disabled", "no-preference"], var.instance_metadata_defaults.instance_metadata_tags),
+    ])
+    error_message = "http_endpoint and instance_metadata_tags must be enabled, disabled or no-preference; http_tokens must be optional, required or no-preference."
+  }
+
+  validation {
+    condition = var.instance_metadata_defaults == null ? true : (
+      var.instance_metadata_defaults.http_put_response_hop_limit == -1 || (
+        var.instance_metadata_defaults.http_put_response_hop_limit >= 1
+        && var.instance_metadata_defaults.http_put_response_hop_limit <= 64
+        && floor(var.instance_metadata_defaults.http_put_response_hop_limit) == var.instance_metadata_defaults.http_put_response_hop_limit
+      )
+    )
+    error_message = "http_put_response_hop_limit must be a whole number from 1 to 64, or -1 for no preference."
+  }
+}
+
 variable "tags" {
   description = "Tags applied to the log bucket."
   type        = map(string)

@@ -111,3 +111,34 @@ resource "aws_iam_account_password_policy" "this" {
 resource "aws_ebs_encryption_by_default" "this" {
   enabled = var.enable_ebs_encryption_by_default
 }
+
+# Regional setting. Removing this resource (or setting the variable to null)
+# calls DisableSnapshotBlockPublicAccess, so snapshot sharing goes back to
+# unblocked rather than staying at the last managed value.
+resource "aws_ebs_snapshot_block_public_access" "this" {
+  count = var.ebs_snapshot_block_public_access == null ? 0 : 1
+
+  state = var.ebs_snapshot_block_public_access
+}
+
+# Regional setting. block-new-sharing only stops AMIs from being made public
+# from now on; AMIs that are already public stay public. Unlike the snapshot
+# block above, removing this resource only drops it from state and leaves the
+# setting as it was in AWS.
+resource "aws_ec2_image_block_public_access" "this" {
+  count = var.ec2_image_block_public_access ? 1 : 0
+
+  state = "block-new-sharing"
+}
+
+# Regional defaults that only apply to instances launched without their own
+# metadata_options, and only to launches after the change. Removing this
+# resource resets every field to no-preference.
+resource "aws_ec2_instance_metadata_defaults" "this" {
+  count = var.instance_metadata_defaults == null ? 0 : 1
+
+  http_endpoint               = var.instance_metadata_defaults.http_endpoint
+  http_tokens                 = var.instance_metadata_defaults.http_tokens
+  http_put_response_hop_limit = var.instance_metadata_defaults.http_put_response_hop_limit
+  instance_metadata_tags      = var.instance_metadata_defaults.instance_metadata_tags
+}
