@@ -3,8 +3,9 @@
 Terraform module that applies a small [AWS](https://aws.amazon.com/) account
 landing-zone baseline. It creates an encrypted, private, versioned log bucket
 that rejects plaintext HTTP, turns on the account-wide S3 public access block,
-sets a strong IAM account password policy and enables EBS encryption by
-default, giving new accounts sane security defaults in one place.
+sets a strong IAM account password policy, enables EBS encryption by default,
+blocks public sharing of EBS snapshots and AMIs, and makes new EC2 instances
+default to IMDSv2, giving new accounts sane security defaults in one place.
 
 > **Account-wide effects.** `aws_s3_account_public_access_block` and
 > `aws_iam_account_password_policy` are singleton, account-scoped resources.
@@ -12,6 +13,26 @@ default, giving new accounts sane security defaults in one place.
 > it alongside another module that manages the same two resources. If the
 > account intentionally serves public S3 content, set
 > `enable_s3_account_public_access_block = false`.
+>
+> **Regional effects.** EBS encryption by default, EBS snapshot and AMI block
+> public access, and the instance metadata defaults are per-region settings of
+> the account and apply to the provider's region. Use one module instance (or
+> one provider alias) per region you want covered, and do not manage the same
+> settings elsewhere.
+>
+> - `ebs_snapshot_block_public_access` defaults to `block-all-sharing`, which
+>   also makes already-public snapshots private. Use `block-new-sharing` to
+>   keep existing public snapshots public. Removing the setting (`null`) turns
+>   blocking off in AWS.
+> - `ec2_image_block_public_access` only blocks new public sharing; AMIs that
+>   are already public stay public. Setting it to `false` stops managing it but
+>   does not unblock it in AWS.
+> - `instance_metadata_defaults` only affects instances launched after the
+>   change that do not set their own `metadata_options`. The default requires
+>   IMDSv2 tokens with a hop limit of 2 (so containers on the instance still
+>   reach IMDS) and hides instance tags from IMDS. Setting it to `null` resets
+>   every field to `no-preference`. Check that your AMIs and SDKs support
+>   IMDSv2 before applying.
 
 ## Usage
 
@@ -36,7 +57,7 @@ A runnable example lives in [`examples/basic`](examples/basic).
 | Name      | Version  |
 |-----------|----------|
 | terraform | >= 1.5   |
-| aws       | >= 5.0   |
+| aws       | >= 5.62  |
 
 ## Inputs
 
@@ -55,6 +76,9 @@ A runnable example lives in [`examples/basic`](examples/basic).
 | `password_reuse_prevention`             | Previous passwords that may not be reused, 0-24. Zero disables.          | `number`      | `24`    |    no    |
 | `allow_users_to_change_password`        | Let IAM users change their own password.                                 | `bool`        | `true`  |    no    |
 | `enable_ebs_encryption_by_default`      | Enable EBS encryption by default in the region.                          | `bool`        | `true`  |    no    |
+| `ebs_snapshot_block_public_access`      | EBS snapshot block public access mode: `block-all-sharing`, `block-new-sharing` or `unblocked`. `null` leaves it unmanaged. | `string` | `"block-all-sharing"` | no |
+| `ec2_image_block_public_access`         | Block new public sharing of AMIs (`block-new-sharing`). `false` leaves it unmanaged. | `bool` | `true` | no |
+| `instance_metadata_defaults`            | Regional IMDS defaults for new instances: `http_endpoint` (`enabled`/`disabled`/`no-preference`, default `no-preference`), `http_tokens` (`optional`/`required`/`no-preference`, default `required`), `http_put_response_hop_limit` (1-64 or -1, default `2`), `instance_metadata_tags` (`enabled`/`disabled`/`no-preference`, default `disabled`). `null` leaves them unmanaged. | `object` | `{}` | no |
 | `tags`                                  | Tags applied to the log bucket.                                          | `map(string)` | `{}`    |    no    |
 
 ## Outputs
@@ -67,6 +91,9 @@ A runnable example lives in [`examples/basic`](examples/basic).
 | `s3_account_public_access_block_enabled` | Whether the account-wide S3 public access block is managed.  |
 | `password_policy_expire_passwords`       | Whether the password policy expires passwords.               |
 | `ebs_encryption_by_default_enabled`      | Whether EBS encryption by default is enabled.                |
+| `ebs_snapshot_block_public_access_state` | EBS snapshot block public access mode, or `null` when unmanaged. |
+| `ec2_image_block_public_access_state`    | AMI block public access state, or `null` when unmanaged.     |
+| `instance_metadata_defaults`             | Applied instance metadata defaults, or `null` when unmanaged. |
 
 ## Testing
 

@@ -27,3 +27,25 @@ output "ebs_encryption_by_default_enabled" {
   description = "Whether EBS encryption by default is enabled in the region."
   value       = aws_ebs_encryption_by_default.this.enabled
 }
+
+output "ebs_snapshot_block_public_access_state" {
+  description = "Block public access mode for EBS snapshots in the region, or null when unmanaged."
+  value       = one(aws_ebs_snapshot_block_public_access.this[*].state)
+}
+
+output "ec2_image_block_public_access_state" {
+  description = "Block public access state for AMIs in the region, or null when unmanaged."
+  value       = one(aws_ec2_image_block_public_access.this[*].state)
+}
+
+output "instance_metadata_defaults" {
+  description = "Instance metadata defaults applied in the region, or null when unmanaged."
+  value = one([
+    for d in aws_ec2_instance_metadata_defaults.this : {
+      http_endpoint               = d.http_endpoint
+      http_tokens                 = d.http_tokens
+      http_put_response_hop_limit = d.http_put_response_hop_limit
+      instance_metadata_tags      = d.instance_metadata_tags
+    }
+  ])
+}
